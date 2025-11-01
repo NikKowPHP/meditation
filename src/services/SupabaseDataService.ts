@@ -17,7 +17,7 @@ export interface Video {
   thumbnail_url: string;
 }
 
-class SupabaseDataService {
+export class SupabaseDataService {
   async getProfile(userId: string): Promise<Profile | null> {
     const { data, error } = await supabase
       .from('profiles')
