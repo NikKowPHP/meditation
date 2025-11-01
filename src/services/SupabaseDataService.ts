@@ -45,7 +45,31 @@ class SupabaseDataService {
     return data || [];
   }
 
+  async ensureProfileExists(): Promise<void> {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) throw userError;
+    if (!user) throw new Error('No authenticated user');
+
+    const existingProfile = await this.getProfile(user.id);
+    if (existingProfile) return;
+
+    const { error: insertError } = await supabase.from('profiles').insert({
+      id: user.id,
+      username: user.email ?? null,
+    });
+
+    if (insertError && insertError.code !== '23505') {
+      throw insertError;
+    }
+  }
+
   async callMeditationCompletion(videoId: string, videoTitle: string): Promise<void> {
+    await this.ensureProfileExists();
+
     const { error } = await supabase.rpc('handle_meditation_completion', {
       video_id_param: videoId,
       video_title_param: videoTitle,
