@@ -26,6 +26,8 @@ const PlayerScreen: React.FC = () => {
   const location = useLocation();
   const router = useIonRouter();
   const [videoParams, setVideoParams] = useState<VideoParams | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [playerReady, setPlayerReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +48,15 @@ const PlayerScreen: React.FC = () => {
         thumbnail: decodeURIComponent(thumbnail),
       });
     }
+
+    setInitialLoading(false);
   }, [location]);
+
+  useEffect(() => {
+    if (videoParams) {
+      setPlayerReady(false);
+    }
+  }, [videoParams]);
 
   const handleVideoEnd = async () => {
     if (!videoParams) return;
@@ -68,20 +78,24 @@ const PlayerScreen: React.FC = () => {
     }
   };
 
+  const handlePlayerReady = () => {
+    setPlayerReady(true);
+  };
+
   const handleAlertDismiss = () => {
     setShowAlert(false);
     router.goBack();
   };
 
-  if (!videoParams) {
-    return <IonLoading isOpen message="Loading video..." />;
-  }
+  const videoTitle = videoParams?.title ?? 'Meditation';
 
   const opts = {
     height: '390',
     width: '100%',
     playerVars: {
       autoplay: 1,
+      controls: 1,
+      rel: 0,
     },
   };
 
@@ -89,20 +103,33 @@ const PlayerScreen: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>{videoParams.title}</IonTitle>
+          <IonTitle>{videoTitle}</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
         <IonHeader collapse="condense">
           <IonToolbar>
-            <IonTitle size="large">{videoParams.title}</IonTitle>
+            <IonTitle size="large">{videoTitle}</IonTitle>
           </IonToolbar>
         </IonHeader>
 
         <div style={{ padding: '16px' }}>
-          <YouTube videoId={videoParams.videoId} opts={opts} onEnd={handleVideoEnd} />
+          {videoParams ? (
+            <YouTube
+              videoId={videoParams.videoId}
+              opts={opts}
+              onReady={handlePlayerReady}
+              onEnd={handleVideoEnd}
+            />
+          ) : (
+            !initialLoading && <p>We couldnt load that video.</p>
+          )}
         </div>
 
+        <IonLoading
+          isOpen={initialLoading || (!!videoParams && !playerReady)}
+          message="Loading video..."
+        />
         <IonLoading isOpen={loading} message="Completing meditation..." />
 
         <IonAlert
