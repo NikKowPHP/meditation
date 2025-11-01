@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -32,6 +32,10 @@ const PlayerScreen: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [completionTriggered, setCompletionTriggered] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playerRef = useRef<any>(null);
+  const completionCheckIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -58,10 +62,31 @@ const PlayerScreen: React.FC = () => {
     }
   }, [videoParams]);
 
-  const handleVideoEnd = async () => {
-    if (!videoParams) return;
+  useEffect(() => {
+    setCompletionTriggered(false);
+    setShowAlert(false);
+    setIsPlaying(false);
 
+    if (completionCheckIntervalRef.current) {
+      window.clearInterval(completionCheckIntervalRef.current);
+      completionCheckIntervalRef.current = null;
+    }
+  }, [videoParams]);
+
+  useEffect(() => {
+    return () => {
+      if (completionCheckIntervalRef.current) {
+        window.clearInterval(completionCheckIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const triggerCompletion = useCallback(async () => {
+    if (!videoParams || completionTriggered) return;
+
+    setCompletionTriggered(true);
     setLoading(true);
+
     try {
       await supabaseDataService.callMeditationCompletion(
         videoParams.videoId,
@@ -73,14 +98,72 @@ const PlayerScreen: React.FC = () => {
       const errorMessage = err instanceof Error ? err.message : 'Completion failed';
       setError(errorMessage);
       setShowToast(true);
+      setCompletionTriggered(false);
     } finally {
       setLoading(false);
     }
+  }, [completionTriggered, videoParams]);
+
+  const handleVideoEnd = () => {
+    triggerCompletion();
   };
 
-  const handlePlayerReady = () => {
+  const handlePlayerReady = (event: { target: any }) => {
+    playerRef.current = event.target;
     setPlayerReady(true);
   };
+
+  const handlePlayerStateChange = (event: { data: number }) => {
+    const state = event.data;
+
+    if (state === 1) {
+      setIsPlaying(true);
+    } else {
+      if (state === 0) {
+        triggerCompletion();
+      }
+      if (state === 2 || state === 0 || state === 3) {
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!isPlaying || !playerRef.current || completionTriggered) {
+      if (completionCheckIntervalRef.current) {
+        window.clearInterval(completionCheckIntervalRef.current);
+        completionCheckIntervalRef.current = null;
+      }
+      return;
+    }
+
+    completionCheckIntervalRef.current = window.setInterval(() => {
+      const player = playerRef.current;
+      if (!player || typeof player.getDuration !== 'function' || typeof player.getCurrentTime !== 'function') {
+        return;
+      }
+
+      const duration = player.getDuration();
+      if (!duration) return;
+      const currentTime = player.getCurrentTime();
+      const threshold = duration > 60 ? duration - 60 : duration * 0.8;
+
+      if (currentTime >= threshold) {
+        if (completionCheckIntervalRef.current) {
+          window.clearInterval(completionCheckIntervalRef.current);
+          completionCheckIntervalRef.current = null;
+        }
+        triggerCompletion();
+      }
+    }, 1000);
+
+    return () => {
+      if (completionCheckIntervalRef.current) {
+        window.clearInterval(completionCheckIntervalRef.current);
+        completionCheckIntervalRef.current = null;
+      }
+    };
+  }, [completionTriggered, isPlaying, triggerCompletion]);
 
   const handleAlertDismiss = () => {
     setShowAlert(false);
@@ -119,10 +202,11 @@ const PlayerScreen: React.FC = () => {
               videoId={videoParams.videoId}
               opts={opts}
               onReady={handlePlayerReady}
+              onStateChange={handlePlayerStateChange}
               onEnd={handleVideoEnd}
             />
           ) : (
-            !initialLoading && <p>We couldnt load that video.</p>
+            !initialLoading && <p>We couldn't load that video.</p>
           )}
         </div>
 

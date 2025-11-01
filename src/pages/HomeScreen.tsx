@@ -33,6 +33,7 @@ const HomeScreen: React.FC = () => {
     try {
       const user = await authService.getCurrentUser();
       if (user.data.user) {
+        await supabaseDataService.ensureProfileExists();
         const profileData = await supabaseDataService.getProfile(user.data.user.id);
         setProfile(profileData);
 
@@ -61,7 +62,7 @@ const HomeScreen: React.FC = () => {
 
   const handleVideoTap = (video: Video) => {
     router.push(
-      `/player?videoId=${video.video_id}&title=${encodeURIComponent(video.title)}&description=${encodeURIComponent(video.description)}&thumbnail=${encodeURIComponent(video.thumbnail_url)}`,
+      `/tabs/player?videoId=${video.video_id}&title=${encodeURIComponent(video.title)}&description=${encodeURIComponent(video.description)}&thumbnail=${encodeURIComponent(video.thumbnail_url)}`,
     );
   };
 
@@ -83,11 +84,15 @@ const HomeScreen: React.FC = () => {
           </IonToolbar>
         </IonHeader>
 
-        {profile && (
-          <StreakDisplay
-            currentStreak={profile.current_streak}
-            longestStreak={profile.longest_streak}
-          />
+        <StreakDisplay
+          currentStreak={profile?.current_streak ?? 0}
+          longestStreak={profile?.longest_streak ?? 0}
+        />
+
+        {!profile && (
+          <div style={{ padding: '0 16px 16px', textAlign: 'center' }}>
+            <p>Complete today&apos;s meditation to start your streak!</p>
+          </div>
         )}
 
         <IonList>

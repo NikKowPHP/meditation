@@ -63,6 +63,9 @@ const AuthenticatedTabs = () => (
       <Route exact path="/tabs/profile">
         <ProfileScreen />
       </Route>
+      <Route path="/tabs/player">
+        <PlayerScreen />
+      </Route>
       <Route exact path="/tabs">
         <Redirect to="/tabs/home" />
       </Route>
@@ -103,13 +106,6 @@ const App = () => {
             }
           />
           <Route
-            path="/player"
-            render={() =>
-              isAuthenticated ? <PlayerScreen /> : <Redirect to="/auth" />
-            }
-          />
-          <Route
-            exact
             path="/auth"
             render={() =>
               isAuthenticated ? <Redirect to="/tabs/home" /> : <AuthScreen />
